@@ -52,7 +52,6 @@ def admin_login(request, added_email=None):
                     admin = admin_salesPerson.objects.filter(
                         email=email, password=password).first()
                     if admin is not None:
-
                         students = admin_salesPerson.objects.all()
                         serializer = AdminSalesPersonSerializer(
                             students, many=True)
