@@ -9,7 +9,7 @@ from django.http import HttpResponse, JsonResponse
 # Create your views here.
 @csrf_exempt
 def mentor_sample(request):
-    return HttpResponse("mentor_sample")
+    return HttpResponse("mentor_sample/")
 
 
 @csrf_exempt
