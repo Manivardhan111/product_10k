@@ -1,9 +1,13 @@
+import json
+import random
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, JsonResponse
 from Apps.SalesPerson.models import admin_salesPerson
-
-from Apps.SalesPerson.serializers import AdminSalesPersonSerializer
+from Apps.SalesPerson.serializers import RegisterSalesPersonSerializer
+from Apps.Student.models import registeredStudents, intrestedStudent
+from django.core.serializers import serialize
+from Apps.Student.serializers import intrestedStudentsSerializer,registeredStudentsSerializer
 
 # Create your views here.
 
@@ -26,11 +30,9 @@ def admin_login(request, added_email=None):
                     email=email, password=password).first()
                 do_exist = admin_salesPerson.objects.filter(
                     email=added_email).first()
-                # return HttpResponse(do_exist)
-
                 if do_exist is None:
                     if admin and admin.role == "super_admin":
-                        serializer = AdminSalesPersonSerializer(
+                        serializer = RegisterSalesPersonSerializer(
                             data={'id': "null", 'name': "null", 'password': "null", 'is_admin': False, "email": added_email, 'approval_status': "pending", 'approved_by': admin.name})
                         if serializer.is_valid():
                             serializer.save()
@@ -52,10 +54,10 @@ def admin_login(request, added_email=None):
                     admin = admin_salesPerson.objects.filter(
                         email=email, password=password).first()
                     if admin is not None:
-                        students = admin_salesPerson.objects.all()
-                        serializer = AdminSalesPersonSerializer(
+                        students = intrestedStudent.objects.all()
+                        serializer = RegisterSalesPersonSerializer(
                             students, many=True)
-                        return JsonResponse(serializer.data, safe=False)
+                        return JsonResponse(json.loads(serializer.data, safe=False))
                     else:
                         return JsonResponse({'success': False, 'message': 'User does not have  admin access'}, status=403)
                 except Exception as e:
@@ -67,20 +69,21 @@ def admin_login(request, added_email=None):
 
 
 @csrf_exempt
-def admin_salesperson_api(request):
+def salesperson_registration(request):
     try:
-        if request.method == "GET":
-            return HttpResponse("admin person/GET")
-        elif request.method == "POST":
-            id = request.POST.get('id', '')
+        if request.method == "POST":
             name = request.POST.get('name', '')
             email = request.POST.get('email', '')
             password = request.POST.get('password', '')
             existing_salesperson = admin_salesPerson.objects.get(email=email)
+            str_name = name.split()
+            id_name = str_name[0]
+            id_num = ''.join(random.choices('0123456789', k=3))
+            id = f"{id_name}{id_num}"
             if existing_salesperson.approval_status != 'success':
                 approver = existing_salesperson.approved_by
                 existing_salesperson.delete()
-                serializer = AdminSalesPersonSerializer(
+                serializer = RegisterSalesPersonSerializer(
                     data={
                         'id': id, 'name': name, 'password': password, 'is_admin': True, "email": email, 'approval_status': "success", 'approved_by': approver
                     }
@@ -96,3 +99,53 @@ def admin_salesperson_api(request):
         return JsonResponse({'success': False, 'message': 'Salesperson not found.'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error processing request: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def get_intrested_students(request, sp_email=None):
+    if request.method=='POST' and sp_email:
+        try:
+            is_authorised = admin_salesPerson.objects.filter(
+                email=sp_email).first()
+
+            if is_authorised is not None and is_authorised.is_admin == True:
+                interested_student_list = intrestedStudent.objects.all()
+                serializer=intrestedStudentsSerializer(interested_student_list,many=True)
+                return JsonResponse({"interested_students":serializer.data})
+                # serialized_data = serialize('json', interested_student_list)
+                # return JsonResponse({"interested_students": serialized_data}, safe=False)
+            elif is_authorised is not None and is_authorised.is_admin == False:
+                return HttpResponse("You do not have admin access")
+            else:
+                return HttpResponse("You are not authorized!")
+
+        except Exception as e:
+            return HttpResponse(f"Error: {str(e)}")
+
+    return HttpResponse("Only POST methods are allowed!")
+
+
+@csrf_exempt
+def get_registered_students(request,sp_email=None):
+    if request.method=='POST' and sp_email:
+        # return HttpResponse("get_registered_students")
+        # return HttpResponse("Hello")
+        try:
+            is_authorised = admin_salesPerson.objects.filter(
+                email=sp_email).first()
+
+            if is_authorised is not None and is_authorised.is_admin == True:
+                registered_student_list = registeredStudents.objects.all()
+                serializer=registeredStudentsSerializer(registered_student_list,many=True)
+                return JsonResponse({"registered_students":serializer.data})
+                # serialized_data = serialize('json', registered_student_list)
+                # return JsonResponse({"registered_students": serialized_data}, safe=False)
+            elif is_authorised is not None and is_authorised.is_admin == False:
+                return HttpResponse("You do not have admin access")
+            else:
+                return HttpResponse("You are not authorized!")
+
+        except Exception as e:
+            return HttpResponse(f"Error: {str(e)}")
+
+    return HttpResponse("Only POST methods are allowed!")

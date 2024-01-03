@@ -1,9 +1,14 @@
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
-from Apps.Mentor.serializers import MentorSerializer
-from Apps.Mentor.models import Mentor
+from Apps.Mentor.serializers import MentorSerializer, AssessmentQuestionsSerializer
+from Apps.Mentor.models import Mentor, Assessment_Questions
 from django.http import HttpResponse, JsonResponse
+from Apps.Student.models import registeredStudents
+from Apps.Student.views import assessment_exam
+# from Apps.Student.Urls import pre_assessment_exam
+
+from django.shortcuts import redirect
 
 
 # Create your views here.
@@ -97,3 +102,49 @@ def mentor_api(request):
         return JsonResponse({'success': False, 'message': 'Mentor not found.'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error processing request: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def add_assessment_questions(request, id=None):
+    if request.method == "GET" and id:
+        registered_student = registeredStudents.objects.filter(id=id).first()
+        if registered_student is not None:
+            all_questions = Assessment_Questions.objects.all()
+            serializer = AssessmentQuestionsSerializer(all_questions, many=True)
+            return JsonResponse({"questions":serializer.data})
+            # assessment_exam(serializer.data,id)
+            # return HttpResponse("Hello")
+            # return redirect("student/pre-assessment-questions")
+    if request.method == "POST":
+        question = request.POST.get("question", '')
+        option_1 = request.POST.get("option1", '')
+        option_2 = request.POST.get("option2", '')
+        option_3 = request.POST.get("option3", '')
+        option_4 = request.POST.get("option4", '')
+        correct_answer = request.POST.get("correct_answer", '')
+
+        try:
+            existing_question = Assessment_Questions.objects.get(
+                question=question)
+            return JsonResponse({"success": False, "message": "Question already exists in the database"})
+        except Assessment_Questions.DoesNotExist:
+            if all([question, option_1, option_2, option_3, option_4, correct_answer]):
+                serializer = AssessmentQuestionsSerializer(data={
+                    "question": question,
+                    "option_1": option_1,
+                    "option_2": option_2,
+                    "option_3": option_3,
+                    "option_4": option_4,
+                    "correct_answer": correct_answer
+                })
+                if serializer.is_valid():
+                    serializer.save()
+                    return JsonResponse({
+                        "success": True, "message": "Question added successfully"
+                    })
+                else:
+                    return JsonResponse({"success": False, "message": "Invalid data provided for Assessment Question"}, status=400)
+            else:
+                return JsonResponse({"success": False, "message": "All fields are required"}, status=400)
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': f'Error processing request: {str(e)}'}, status=500)
